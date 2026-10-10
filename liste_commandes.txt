@@ -1,0 +1,42 @@
+- créer un BC dans un terminal qu'on touchera plus jms :
+anvil
+
+- checker nb de blocs dans la BC :
+cast block-number (prochain bloc pas obligatoire pcq là c l'url par défaut pcq en local pcq anvil est trop gentil et il connait tout)--rpc-url http://127.0.0.1:8545 
+
+- sans passer par les focntions d'un quelconque contrat :
+cast send ADRESSE_RECEVEUR --value 1ether --private-key KEY_ENVOYEUR --rpc-url http://127.0.0.1:8545
+cast balance ADDRESSE --ether
+
+
+
+- déployer un contrat : 
+forge build (compiler après avoir save le nveau contrat)
+forge create src/Counter.sol:Counter --broadcast --private-key CLEPRIVEE_D'UN_COMPTE --rpc-url http://127.0.0.1:8545
+
+- Exécuter fonction d'un contrat :
+cast send ADRESSE_DU_CONTRAT "fonction(type1, type2, ...)" arg1 arg2 ... --private-key KEY_APPELEUR --rpc-url http://127.0.0.1:8545 
+
+- Exécuter fonction "spéciales" d'un contrat :
+cast send ADRESSE_DU_CONTRAT "deposit()" --value 1ether --private-key KEY_APPELEUR --rpc-url http://127.0.0.1:8545 
+
+- Exécuter fonction "call" d'un contrat :
+cast call ADRESSE_DU_CONTRAT "fonction(type_arg1, type_arg2...)(type_return)" arg1 arg2
+        Attention : si fonction retourn une struc, alors mettre les types de la struc les uns après les autres et pas juste le nom de la struct
+cast call ADRESSE_DU_CONTRAT "balances(address)(uint256)" argument_de_l'appel
+
+
+
+cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "requestWithdrawal()" --value 1ether --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --rpc-url http://127.0.0.1:8545 
+
+
+
+
+
+
+
+
+
+
+
+
