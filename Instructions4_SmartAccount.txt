@@ -1,0 +1,54 @@
+###################################################################################################
+###############################   CHANGER D'OWNER   ###############################################
+###################################################################################################
+
+
+1
+Qqun crée un compte et devient le owner. Ici ALICE :
+forge create src/SmartAccount.sol:SmartAccount --rpc-url $RPC --private-key $ALICE_KEY --broadcast --constructor-args $ALICE_ADDR
+export ACCT=ADRESSE_DU_COMPTE
+
+2
+Le nourri vite fait :
+cast send $ACCT --value 3ether --private-key $ALICE_KEY --rpc-url $RPC
+
+3
+Crée ALICE_NEW :
+cast wallet new
+export ALICE2_ADDR=ADRESSE_NOUVELLE_CLE
+export ALICE2_KEY=CLE_NOUVELLE_CLE
+
+4
+Crée un HASH. Il contient la fonction qu'on veut appeler (setOwner()):
+export DATA=$(cast calldata "setOwner(address)" $ALICE2_ADDR)
+export HASH=$(cast call $ACCT "getHash(address,uint256,bytes)(bytes32)" $ACCT 0 $DATA --rpc-url $RPC)
+    N'importe qui peut créer ce HASH
+
+5
+export SIG=$(cast wallet sign --private-key $ALICE_KEY $HASH)
+    ALICE décide de le signer. 
+    Y'a que la fonction execute() qui arrive à voir si une signature provient de owner ou pas
+
+
+6
+Mtn le combo HASH + SIG peut être amené à execute() par n'importe qui. Ici Swissquote (qui paie gas zb) :
+cast send $ACCT "execute(address,uint256,bytes,bytes)" $ACCT 0 $DATA $SIG --private-key $SQ_KEY --rpc-url $RPC
+cast call $ACCT "owner()(address)" --rpc-url $RPC
+    Dernière ligne renvoie le nveau owner
+
+
+7
+Mtn, si un HASH est signé par ALICE_KEY, bah execute va planter au moment "msg.sender == owner"
+Pcq mtn, c'est sensé être ALICE2_KEY qui signe. Eventhough cette key est jamais transmise :
+export HASH=$(cast call $ACCT "getHash(address,uint256,bytes)(bytes32)" $DEST 1000000000000000000 0x --rpc-url $RPC)
+export SIG=$(cast wallet sign --private-key $ALICE_KEY $HASH)
+export SIG_2=$(cast wallet sign --private-key $ALICE2_KEY $HASH)
+
+Ici, va planter si passe $SIG et pas $SIG_2
+cast send $ACCT "execute(address,uint256,bytes,bytes)" $DEST 1000000000000000000 0x $SIG --private-key $SQ_KEY --rpc-url $RPC
+
+
+
+
+
+
