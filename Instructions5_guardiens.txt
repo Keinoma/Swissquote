@@ -1,0 +1,110 @@
+###################################################################################################
+###############################   CHANGER D'OWNER   ###############################################
+###################################################################################################
+
+0
+Ici on a ALICE qui est owner d'un compte, et NEW (nouvel appareil que Alice veut setOwner).
+3 guardiens : SQ, G2(IPad d'Alice) et G3(proche amis de longue date)
+On va voir comment faire pr que seulement 2/3 guardiens peuvent set NEW comme nouvel owner
+
+    cast wallet new
+    export G2_ADDR=ADRESSE_APPAREIL
+    export G2_KEY=CLE_APPAREIL
+    cast send $G2_ADDR --value 1ether --private-key $SQ_KEY --rpc-url $RPC
+
+    cast wallet new
+    export G3_ADDR=ADRESSE_PROCHE
+    export G3_KEY=CLE_PROCHE
+    cast send $G3_ADDR --value 1ether --private-key $SQ_KEY --rpc-url $RPC
+
+    cast wallet new
+    export NEW_ADDR=ADRESSE_NOUVELLE_ALICE
+    export NEW_KEY=CLE_NOUVELLE_ALICE
+    cast send $NEW_ADDR --value 1ether --private-key $SQ_KEY --rpc-url $RPC
+
+
+1
+Alice crée son compte et n'a pas encore perdu sa KEY. A la création, elle spécifie les guardiens :    
+    forge create src/Wallet.sol:Wallet --rpc-url $RPC --private-key $ALICE_KEY --broadcast --constructor-args $ALICE_ADDR "[$SQ_ADDR,$G2_ADDR,$G3_ADDR]"
+        export WALLET=ADRESSE_DU_WALLET
+    cast send $WALLET --value 3ether --private-key $ALICE_KEY --rpc-url $RPC
+    cast call $WALLET "owner()(address)" --rpc-url $RPC
+
+    L'owner est ALICE_ADDR pr l'instant
+
+
+2
+Alice perd sa ALICE_KEY, mais elle a toujours son IPad (G2).
+Elle dmd à Swissquote de l'aider à setOwner son nouvel appareil (NEW).
+Swissquote lui fait confiance = FaceID... --> mocké
+
+2.1
+Teste que si y'a seulement un seul appel à approveRecovery(), bah <2 donc ca plante
+    cast send $WALLET "approveRecovery(address)" $NEW_ADDR --private-key $SQ_KEY --rpc-url $RPC
+    cast send $WALLET "finalizeRecovery()" --private-key $SQ_KEY --rpc-url $RPC
+    (finalize peut être appelé par n'imp qui. On s'en balec d'autoriser un truc qui a nécessité des guardiens)
+
+2.2
+Mtn, on fait un deuxième appel (celui de la step préc compte tjr) et on rappelle finalizeRecovery().
+Mais le 2ème appel est fait par la mm key qui a fait le 1er. Donc finalize() plante aussi : 
+    cast send $WALLET "approveRecovery(address)" $NEW_ADDR --private-key $SQ_KEY --rpc-url $RPC
+    cast send $WALLET "finalizeRecovery()" --private-key $SQ_KEY --rpc-url $RPC
+
+2.3
+Mtn, fait un 2ème appel valide avec G2.
+Mais on attends <24h avant de faire finalize(). Ducoup ça plante, pour le délais pas pr le nombre de recovery ou de guardiens différent
+    cast send $WALLET "approveRecovery(address)" $NEW_ADDR --private-key $G2_KEY --rpc-url $RPC
+    cast send $WALLET "finalizeRecovery()" --private-key $SQ_KEY --rpc-url $RPC
+
+
+2.4
+On avance de 24h l'horlgoe interne. Et on finalize() :
+    cast rpc evm_increaseTime 86400 --rpc-url $RPC
+    cast rpc evm_mine --rpc-url $RPC
+    cast send $WALLET "finalizeRecovery()" --private-key $SQ_KEY --rpc-url $RPC
+    cast call $WALLET "owner()(address)" --rpc-url $RPC
+
+
+3
+Mtn, G2 est devenu owner. On peut le vérifier en le faisant signer des HASH :
+    export HASH=$(cast call $WALLET "getHash(address,uint256,bytes)(bytes32)" $DEST 1000000000000000000 0x --rpc-url $RPC)
+    export SIG=$(cast wallet sign --private-key $NEW_KEY $HASH)
+    cast send $WALLET "execute(address,uint256,bytes,bytes)" $DEST 1000000000000000000 0x $SIG --private-key $SQ_KEY --rpc-url $RPC
+
+
+
+4.
+Si ALICE a pas perdu son tél.
+Mais la malveillante MALLORY convainc Swissquote et le proche de ALICE :
+    cast send $WALLET "approveRecovery(address)" $MALLORY_ADDR --private-key $SQ_KEY --rpc-url $RPC
+    cast send $WALLET "approveRecovery(address)" $MALLORY_ADDR --private-key $G3_KEY --rpc-url $RPC
+
+Et bah ALICE
+    cast send $WALLET "cancelRecovery()" --private-key $NEW_KEY --rpc-url $RPC
+    cast send $WALLET "finalizeRecovery()" --private-key $SQ_KEY --rpc-url $RPC
+    ATTENTION : ici, c'est "NEW_KEY" qui cancel pcq avec les commandes préc, NEW est devenu l'owner. 
+        Mais c'est bien l'owner qui a 24h pour cancel()
+
+
+5
+Problèmes :
+
+5.1
+Si ALICE perd d'abord son tél. Donc owner key est au fond du lac.
+ET les deux proposent Mallory. Bah là elle peut pas cancel pdt le délais des 24h. 
+    Donc sa seule solution c'est de demander à sa banque de proposer un autre compte très vite, avant que les 24h soient écoulées.
+
+5.2
+Si ALICE perd indeed mais un guardien devenu malveillant entre temps empêche la récup. MAis ça voilà on s'en balec je pense
+
+
+
+
+
+
+
+
+
+
+
+
