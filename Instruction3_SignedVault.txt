@@ -1,0 +1,53 @@
+################################  STEP 3 #########################################
+
+1
+forge install OpenZeppelin/openzeppelin-contracts
+
+2
+Créer remappings.txt à la racine :
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+
+3
+Créer src/SigneVault.sol et le remplir :
+
+4
+forge create src/SignedVault.sol:SignedVault --rpc-url $RPC --private-key $ALICE_KEY --broadcast --constructor-args $ALICE_ADDR
+Ca va donner une nouvelle ADDRESSE pr ce coffre de l'étape 3
+
+5
+export VAULT3=ADRESSE_DU_COFFRE_3
+cast send $VAULT3 --value 3ether --private-key $ALICE_KEY --rpc-url $RPC
+
+6
+Là on veut juste créer un rapport de la demande (HASH). 
+On en a besoin pr créer la signature. La signature "doit bien signer qqch" ... -> le HASH
+export HASH=$(cast call $VAULT3 "getHash(uint256,address)(bytes32)" 1000000000000000000 $DEST --rpc-url $RPC)
+
+
+7
+Ici, ALICE va générer un signature cryptographique hors ligne et sans gas. 
+C'est fait à partir de HASH et ALICE_KEY
+export SIG=$(cast wallet sign --private-key $ALICE_KEY $HASH)
+echo $SIG
+
+
+8
+Swissquote a accès à cette signature et peut donc exécuter la fonction (et payer gas) :
+cast send $VAULT3 "withdrawSigned(uint256,address,bytes)" 1000000000000000000 $DEST $SIG --private-key $SQ_KEY --rpc-url $RPC
+
+9
+Tentatives de triche sensée foirer :
+cast send $VAULT3 "withdrawSigned(uint256,address,bytes)" 1000000000000000000 $DEST $SIG --private-key $SQ_KEY --rpc-url $RPC
+    Pcq le 1er HASH a été fait à partir de once.
+    Et ce nonce s'est incrémenté à la fin de l'étape 8, dans la fonction withdraSigned()"
+
+
+10
+Autre tentative de triche sensée foirer :
+cast send $VAULT3 "withdrawSigned(uint256,address,bytes)" 1000000000000000000 $SQ_ADDR $SIG --private-key $SQ_KEY --rpc-url $RPC
+    Pcq ici ca veut withdraw -> SQ_ADRR au lieu de DEST. 
+    Et HASH de base avait été créé pr withdraw -> DEST
+
+
+
+
