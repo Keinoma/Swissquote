@@ -4,6 +4,11 @@ anvil
 - checker nb de blocs dans la BC :
 cast block-number (prochain bloc pas obligatoire pcq là c l'url par défaut pcq en local pcq anvil est trop gentil et il connait tout)--rpc-url http://127.0.0.1:8545 
 
+- donner des p'tits noms : 
+export SQ_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    Donc mtn peux juste écrire $SQ_ADDR (pas oublier $) au lieu de toute la ptn de key de Swissquote
+
+
 - sans passer par les focntions d'un quelconque contrat :
 cast send ADRESSE_RECEVEUR --value 1ether --private-key KEY_ENVOYEUR --rpc-url http://127.0.0.1:8545
 cast balance ADDRESSE --ether
