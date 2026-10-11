@@ -1,4 +1,4 @@
-<!DOCTYPE html>             // installe l'extension live server et clic droit -> lancer avec live server
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -10,16 +10,62 @@
   table{border-collapse:collapse;width:100%}
   td,th{border:1px solid #ccc;padding:.3rem .6rem;text-align:left;font-size:.9rem}
   input,select,button{font-size:.95rem;padding:.35rem .6rem;margin:.15rem}
-  input{width:7rem} 
+  input{width:7rem}
+  .authForm input{width:12rem;display:block}
+  .authForm label{display:block;margin:.4rem 0}
+  #authMsg{min-height:1.5rem}
+  .err{color:#c00}.good{color:#080}
+  .link{background:none;border:none;color:#06c;text-decoration:underline;cursor:pointer;padding:0}
   #log{background:#111;color:#ddd;padding:.75rem;min-height:100px;max-height:260px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:.85rem}
   .ok{color:#6c6}.ko{color:#f77}.info{color:#8af}
 </style>
 </head>
 <body>
 
+<!-- ÉCRAN DE CONNEXION / CRÉATION DE COMPTE -->
+<div id="authScreen">
+
+  <div id="loginBox">
+    <h1>Connexion</h1>
+    <form class="authForm" onsubmit="return login(event)">
+      <label>Nom d'utilisateur
+        <input id="loginUser" type="text" autocomplete="username" autofocus>
+      </label>
+      <label>Mot de passe
+        <input id="loginPass" type="password" autocomplete="current-password">
+      </label>
+      <button type="submit">Se connecter</button>
+    </form>
+    <p>Pas encore de compte ? <button class="link" onclick="showSignup()">Créer un compte</button></p>
+  </div>
+
+  <div id="signupBox" hidden>
+    <h1>Créer un compte</h1>
+    <form class="authForm" onsubmit="return signup(event)">
+      <label>Nom d'utilisateur
+        <input id="signUser" type="text" autocomplete="username">
+      </label>
+      <label>Mot de passe
+        <input id="signPass" type="password" autocomplete="new-password">
+      </label>
+      <label>Confirmer le mot de passe
+        <input id="signPass2" type="password" autocomplete="new-password">
+      </label>
+      <button type="submit">Créer mon compte</button>
+    </form>
+    <p>Déjà un compte ? <button class="link" onclick="showLogin()">Se connecter</button></p>
+  </div>
+
+  <div id="authMsg"></div>
+</div>
+
+<!-- APPLICATION (cachée tant qu'on n'est pas connecté) -->
+<div id="app" hidden>
+
 <h1>Wallet - démo</h1>
-<p>Simulation dans le navigateur (pas de blockchain). Seul l'owner du wallet peut en retirer de l'argent.</p>
+<p>Connecté en tant que <b id="currentUser"></b>. Simulation dans le navigateur (pas de blockchain). Seul l'owner du wallet peut en retirer de l'argent.</p>
 <button onclick="resetAll()">Réinitialiser tout</button>
+<button onclick="logout()">Se déconnecter</button>
 
 <section>
 <h2>1. Compte connecté</h2>
@@ -51,7 +97,101 @@ Vers <select id="dest"></select>
 <h3>Journal</h3>
 <div id="log"></div>
 
+</div>
+
 <script>
+// ---------- Comptes utilisateurs (stockés dans le navigateur) ----------
+const STORAGE_KEY = 'walletUsers';
+
+function loadUsers(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveUsers(users){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(users)); return true; }
+  catch(e){ return false; }
+}
+
+// Le mot de passe n'est jamais stocké en clair : on garde son empreinte SHA-256
+async function hashPassword(username, password){
+  const data = new TextEncoder().encode(username + ':' + password);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function message(text, cls){
+  const m = document.getElementById('authMsg');
+  m.textContent = text;
+  m.className = cls || '';
+}
+
+function showSignup(){
+  document.getElementById('loginBox').hidden = true;
+  document.getElementById('signupBox').hidden = false;
+  message('');
+}
+function showLogin(){
+  document.getElementById('signupBox').hidden = true;
+  document.getElementById('loginBox').hidden = false;
+  message('');
+}
+
+async function signup(e){
+  e.preventDefault();
+  const username = val('signUser').trim();
+  const pass = val('signPass'), pass2 = val('signPass2');
+  if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
+  if(!username) return message('Entre un nom d\'utilisateur.', 'err'), false;
+  if(!pass) return message('Entre un mot de passe.', 'err'), false;
+  if(pass !== pass2) return message('Les deux mots de passe ne correspondent pas.', 'err'), false;
+
+  const users = loadUsers();
+  const key = username.toLowerCase();
+  if(users[key]) return message('Ce nom d\'utilisateur est déjà pris.', 'err'), false;
+
+  users[key] = {name: username, hash: await hashPassword(key, pass)};
+  if(!saveUsers(users)) return message('Impossible d\'enregistrer le compte dans ce navigateur.', 'err'), false;
+
+  // On efface tous les champs, y compris le nom d'utilisateur
+  document.getElementById('signUser').value = '';
+  document.getElementById('signPass').value = '';
+  document.getElementById('signPass2').value = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  showLogin();
+  message('Compte créé. Tu peux maintenant te connecter.', 'good');
+  return false;
+}
+
+async function login(e){
+  e.preventDefault();
+  const username = val('loginUser').trim();
+  const key = username.toLowerCase();
+  if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
+
+  const user = loadUsers()[key];
+  if(user && user.hash === await hashPassword(key, val('loginPass'))){
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('app').hidden = false;
+    document.getElementById('currentUser').textContent = user.name;
+    message('');
+    resetAll();
+  } else {
+    message('Nom d\'utilisateur ou mot de passe incorrect.', 'err');
+  }
+  return false;
+}
+
+function logout(){
+  document.getElementById('app').hidden = true;
+  document.getElementById('authScreen').hidden = false;
+  document.getElementById('currentUser').textContent = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  showLogin();
+}
+
+// ---------- Wallet ----------
 const NAMES = {ALICE:'Alice', BOB:'Bob', CAROL:'Carol'};
 let accounts, wallet;   // wallet = null tant qu'il n'est pas créé
 
