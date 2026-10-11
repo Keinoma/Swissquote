@@ -23,6 +23,7 @@ Le fichier src/Wallet.sol permet le comportement décrit ci-dessus. On peut s'en
 ==========================================================================================
 
 Le script Wallet.sol imite ERC-4337 avec anvil. Nous avons tenté de le traduire proprement avec WalletAA.sol et les /scripts-aa/ mais n'avons pas réussi dans le temps impartis malheureusement.
+
 Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 
 ==========================================================================================
