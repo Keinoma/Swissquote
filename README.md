@@ -9,6 +9,7 @@ Une fois son appareil perdu, deux (différents) gardiens peuvent approveRecovery
 Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est probablement elle qui a demandé à ce que son nouvel appareil devienne owner à la place de son ancienne adresse)
 
 ==========================================================================================
+
 La fonction approveRecovery() deamnde à être appelée par un guardien. Elle nécessite aussi d'être est appelée 2 fois, et par 2 guardiens différents.
 La fonction finalizeREcovery() est appelable après 24h et sert de validation au changement de compte "owner" approuvé 2 fois. Elle est appelable par n'importe qui comme cela ne peut pas causer de tort à l'ancienne propriétaire du compte.
 Si en revanche, un pirate parvient à faire que 2 guardiens appellent approveRecovery(), le délais de 24heures sert à laisser du temps au possesseur actuel du compte pour se rendre comtpe de la supercherie et appeler cancelRecovery().
@@ -29,9 +30,22 @@ Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 ==========================================================================================
 
 
-## 1. Ce qui est réel (vérifiable sur Etherscan)
+## 1. Ce qui est mocké ou simplifié
 
-| Élément | Preuve |
+| Élément | Ce qu'il y a dans le prototype | Ce que ferait la vraie version |
+|---|---|---|
+| Décision de Swissquote comme gardien | Une simple clé de test qui approuve quand on l'appelle | Serveur de gardien : contrôle d'identité (KYC, FaceID, appel), journal d'audit, validation humaine |
+| Alice, G2 (iPad), G3 (proche), NEW, Mallory | Clés de test dans `.env` (ignoré par Git) | Clés/passkeys sur de vrais appareils ; le proche signe depuis son propre appareil |
+| Clé propriétaire | Clé Ethereum de test (ECDSA) | Passkey WebAuthn (clé P-256 dans l'appareil, jamais exportée) |
+| Rôles de SQ | Une seule clé joue déployeur, relayeur et gardien | Trois rôles séparés ; le serveur de gardien ne partage pas sa clé avec le relayeur |
+| Relayeur / bundler | SQ envoie lui-même les transactions | Bundler ERC-4337 ; paymaster optionnel pour sponsoriser le gas |
+| Délai de récupération | **12 secondes** (démo) | 24 h ou plus, avec alertes ; en démo, la fenêtre d'annulation est d'environ un bloc |
+| Alertes à Alice | Absentes | Notification push/e-mail/SMS à chaque `approveRecovery`, sur plusieurs canaux |
+| Application bancaire | Terminal (`cast`) | Application mobile Swissquote |
+| ETH | ETH de test (faucet), sans valeur | Fonds réels (hors périmètre : pas de mainnet) |Ce qui est réel (vérifiable sur Etherscan)
+
+
+## 2. | Élément | Preuve |
 |---|---|
 | Déploiement du contrat sur un vrai testnet | Transaction de création, voir section 4 |
 | Propriétaire et 3 gardiens inscrits dans la blockchain | `owner()` et `guardians(i)` lisibles par n'importe qui |
@@ -44,20 +58,6 @@ Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 | Banque = relayeur, pas propriétaire | Sur Etherscan, l'expéditeur de `execute` est SQ (il paie le gas) ; la signature qui autorise est celle de NEW |
 | Clé de déploiement protégée | Coffre chiffré Foundry (`cast wallet import`), jamais écrite dans une commande |
 | Bibliothèques établies | OpenZeppelin (`ECDSA`, `MessageHashUtils`) ; aucune cryptographie maison |
-
-## 2. Ce qui est mocké ou simplifié
-
-| Élément | Ce qu'il y a dans le prototype | Ce que ferait la vraie version |
-|---|---|---|
-| Décision de Swissquote comme gardien | Une simple clé de test qui approuve quand on l'appelle | Serveur de gardien : contrôle d'identité (KYC, FaceID, appel), journal d'audit, validation humaine |
-| Alice, G2 (iPad), G3 (proche), NEW, Mallory | Clés de test dans `.env` (ignoré par Git) | Clés/passkeys sur de vrais appareils ; le proche signe depuis son propre appareil |
-| Clé propriétaire | Clé Ethereum de test (ECDSA) | Passkey WebAuthn (clé P-256 dans l'appareil, jamais exportée) |
-| Rôles de SQ | Une seule clé joue déployeur, relayeur et gardien | Trois rôles séparés ; le serveur de gardien ne partage pas sa clé avec le relayeur |
-| Relayeur / bundler | SQ envoie lui-même les transactions | Bundler ERC-4337 ; paymaster optionnel pour sponsoriser le gas |
-| Délai de récupération | **12 secondes** (démo) | 24 h ou plus, avec alertes ; en démo, la fenêtre d'annulation est d'environ un bloc |
-| Alertes à Alice | Absentes | Notification push/e-mail/SMS à chaque `approveRecovery`, sur plusieurs canaux |
-| Application bancaire | Terminal (`cast`) | Application mobile Swissquote |
-| ETH | ETH de test (faucet), sans valeur | Fonds réels (hors périmètre : pas de mainnet) |
 
 ## 3. Le reste de notre marche à suivre si le temps le permettait
 
