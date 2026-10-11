@@ -45,7 +45,9 @@ Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 | ETH | ETH de test (faucet), sans valeur | Fonds réels (hors périmètre : pas de mainnet) |Ce qui est réel (vérifiable sur Etherscan)
 
 
-## 2. | Élément | Preuve |
+## 2. Ce qui existe bien
+
+| Élément | Preuve |
 |---|---|
 | Déploiement du contrat sur un vrai testnet | Transaction de création, voir section 4 |
 | Propriétaire et 3 gardiens inscrits dans la blockchain | `owner()` et `guardians(i)` lisibles par n'importe qui |
