@@ -63,42 +63,37 @@
 <div id="app" hidden>
 
 <h1>Wallet - démo</h1>
-<p>Connecté en tant que <b id="currentUser"></b>. Simulation dans le navigateur (pas de blockchain). Seul l'owner du wallet peut en retirer de l'argent.</p>
-<button onclick="resetAll()">Réinitialiser tout</button>
+<p>Connecté en tant que <b id="currentUser"></b>. Simulation dans le navigateur (pas de blockchain). Chaque compte a son propre wallet, et seul son owner peut en retirer de l'argent.</p>
 <button onclick="logout()">Se déconnecter</button>
 <button onclick="askDelete()">Supprimer mon compte</button>
 
 <div id="deleteBox" hidden>
-  <p class="err">Supprimer définitivement ton compte ? Ton nom d'utilisateur et ton mot de passe seront effacés.</p>
+  <p class="err">Supprimer définitivement ton compte ? Ton nom d'utilisateur, ton mot de passe et ton wallet seront effacés.</p>
   <button onclick="deleteAccount(true)">Oui</button>
   <button onclick="deleteAccount(false)">Non</button>
 </div>
 
 <section>
-<h2>1. Compte connecté</h2>
-<select id="me" onchange="render()"></select>
-<table id="accounts"></table>
-</section>
-
-<section>
-<h2>2. Créer le wallet</h2>
-<p>Le compte connecté devient l'owner.</p>
-Dépôt initial (ETH) <input id="initDeposit" type="number" min="0" step="any" value="3">
-<button id="createBtn" onclick="createWallet()">Créer le wallet</button>
-</section>
-
-<section>
-<h2>3. Wallet</h2>
+<h2>Mon wallet</h2>
 <table id="wallet"></table>
 
-<h3>Déposer (tout le monde peut)</h3>
-Montant (ETH) <input id="depAmount" type="number" min="0" step="any" value="1">
-<button onclick="deposit()">Déposer</button>
+<div id="createBox">
+  <p>Tu n'as pas encore de wallet. Il sera créé à 0 ETH et t'appartiendra.</p>
+  <button onclick="createWallet()">Créer mon wallet</button>
+</div>
 
-<h3>Retirer (owner uniquement)</h3>
-Montant (ETH) <input id="wdAmount" type="number" min="0" step="any" value="1">
-Vers <select id="dest"></select>
-<button onclick="withdraw()">Retirer</button>
+<div id="actionsBox" hidden>
+  <h3>Recharger</h3>
+  Montant (ETH) <input id="depAmount" type="number" min="0" step="any" value="1">
+  <button onclick="deposit()">Recharger</button>
+
+  <h3>Retirer (owner uniquement)</h3>
+  Montant (ETH) <input id="wdAmount" type="number" min="0" step="any" value="1">
+  <button onclick="withdraw()">Retirer</button>
+
+  <h3>Réinitialiser</h3>
+  <button onclick="resetWallet()">Supprimer mon wallet</button>
+</div>
 </section>
 
 <h3>Journal</h3>
@@ -109,6 +104,7 @@ Vers <select id="dest"></select>
 <script>
 // ---------- Comptes utilisateurs (stockés dans le navigateur) ----------
 const STORAGE_KEY = 'walletUsers';
+let currentKey = null;   // clé du compte actuellement connecté
 
 function loadUsers(){
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
@@ -153,13 +149,13 @@ async function signup(e){
   if(pass !== pass2) return message('Les deux mots de passe ne correspondent pas.', 'err'), false;
 
   const users = loadUsers();
-  const key = username;
-  if(users[key]) return message('Ce compte déjà existant. Retourne à l\'écran de connexion.', 'err'), false;
+  const key = username;   // les majuscules comptent
+  if(users[key]) return message('Ce compte existe déjà. Retourne à l\'écran de connexion (lien « Se connecter » ci-dessus) et tape le mot de passe enregistré auparavant.', 'err'), false;
 
-  users[key] = {name: username, hash: await hashPassword(key, pass)};
+  // Un nouveau compte n'a pas de wallet (wallet: null)
+  users[key] = {name: username, hash: await hashPassword(key, pass), wallet: null};
   if(!saveUsers(users)) return message('Impossible d\'enregistrer le compte dans ce navigateur.', 'err'), false;
 
-  // On efface tous les champs, y compris le nom d'utilisateur
   document.getElementById('signUser').value = '';
   document.getElementById('signPass').value = '';
   document.getElementById('signPass2').value = '';
@@ -170,22 +166,23 @@ async function signup(e){
   return false;
 }
 
-let currentKey = null;   // clé du compte actuellement connecté
-
 async function login(e){
   e.preventDefault();
   const username = val('loginUser').trim();
-  const key = username;
+  const key = username;   // les majuscules comptent
   if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
 
   const user = loadUsers()[key];
   if(user && user.hash === await hashPassword(key, val('loginPass'))){
+    currentKey = key;
+    wallet = user.wallet || null;   // le wallet propre à ce compte
     document.getElementById('authScreen').hidden = true;
     document.getElementById('app').hidden = false;
     document.getElementById('currentUser').textContent = user.name;
-    currentKey = key;
+    document.getElementById('deleteBox').hidden = true;
+    document.getElementById('log').innerHTML = '';
     message('');
-    resetAll();
+    render();
   } else {
     message('Nom d\'utilisateur ou mot de passe incorrect.', 'err');
   }
@@ -193,6 +190,8 @@ async function login(e){
 }
 
 function logout(){
+  currentKey = null;
+  wallet = null;
   document.getElementById('app').hidden = true;
   document.getElementById('authScreen').hidden = false;
   document.getElementById('currentUser').textContent = '';
@@ -200,6 +199,7 @@ function logout(){
   document.getElementById('loginPass').value = '';
   showLogin();
 }
+
 function askDelete(){
   document.getElementById('deleteBox').hidden = false;
 }
@@ -209,66 +209,59 @@ function deleteAccount(confirmed){
   if(!confirmed) return;
 
   const users = loadUsers();
-  delete users[currentKey];
+  delete users[currentKey];   // supprime aussi le wallet du compte
   if(!saveUsers(users)) return alert('Impossible de supprimer le compte dans ce navigateur.');
 
-  currentKey = null;
-  logout();   // retour à l'écran de connexion, champs vidés
-  message('Compte supprimé.', 'good');
+  logout();
+  message('Compte supprimé. Crée un nouveau compte ou connecte-toi à un autre compte.', 'good');
 }
 
-// ---------- Wallet ----------
-const NAMES = {ALICE:'Alice', BOB:'Bob', CAROL:'Carol'};
-let accounts, wallet;   // wallet = null tant qu'il n'est pas créé
+// ---------- Wallet (un par compte, enregistré avec le compte) ----------
+let wallet = null;   // null tant que le compte n'a pas créé son wallet
 
-function init(){
-  accounts = {ALICE:10, BOB:10, CAROL:10};
-  wallet = null;
-  document.getElementById('log').innerHTML = '';
-  log('Chaque compte démarre avec 10 ETH.', 'info');
-}
-
-function resetAll(){
-  document.getElementById('deleteBox').hidden = true;
-  init();
-  document.getElementById('me').value = 'ALICE';
-  document.getElementById('dest').value = 'ALICE';
-  document.getElementById('initDeposit').value = 3;
-  document.getElementById('depAmount').value = 1;
-  document.getElementById('wdAmount').value = 1;
-  render();
+function saveWallet(){
+  const users = loadUsers();
+  if(!users[currentKey]) return false;
+  users[currentKey].wallet = wallet;
+  return saveUsers(users);
 }
 
 function createWallet(){
-  const me = val('me'), amount = num('initDeposit');
   if(wallet) return log('Création : REVERT « Wallet déjà créé »', 'ko');
-  if(isNaN(amount) || amount < 0) return log('Création : REVERT « Montant invalide »', 'ko');
-  if(accounts[me] < amount) return log('Création : REVERT « Solde insuffisant »', 'ko');
-  accounts[me] -= amount;
-  wallet = {owner: me, balance: amount, nonce: 0};
-  log(NAMES[me] + ' crée le wallet (owner = ' + NAMES[me] + ') avec ' + amount + ' ETH', 'ok');
+  wallet = {owner: currentKey, balance: 0, nonce: 0};
+  saveWallet();
+  log('Wallet créé (owner = ' + currentKey + ', solde = 0 ETH)', 'ok');
   render();
 }
 
 function deposit(){
-  const me = val('me'), amount = num('depAmount');
-  if(!wallet) return log('Dépôt : REVERT « Pas de wallet »', 'ko');
-  if(!(amount > 0)) return log('Dépôt : REVERT « Montant invalide »', 'ko');
-  if(accounts[me] < amount) return log('Dépôt : REVERT « Solde insuffisant »', 'ko');
-  accounts[me] -= amount; wallet.balance += amount;
-  log(NAMES[me] + ' dépose ' + amount + ' ETH', 'ok');
+  const amount = num('depAmount');
+  if(!wallet) return log('Recharge : REVERT « Pas de wallet »', 'ko');
+  if(!(amount > 0)) return log('Recharge : REVERT « Montant invalide »', 'ko');
+  wallet.balance += amount;
+  saveWallet();
+  log('Wallet rechargé de ' + amount + ' ETH', 'ok');
   render();
 }
 
-// Même règle que execute() dans Wallet.sol : la signature doit venir de l'owner
+// Même règle que execute() dans Wallet.sol : seul l'owner peut retirer
 function withdraw(){
-  const me = val('me'), amount = num('wdAmount'), to = val('dest');
+  const amount = num('wdAmount');
   if(!wallet) return log('Retrait : REVERT « Pas de wallet »', 'ko');
-  if(me !== wallet.owner) return log(NAMES[me] + ' retire ' + amount + ' ETH : REVERT « Signature invalide » (owner = ' + NAMES[wallet.owner] + ')', 'ko');
+  if(wallet.owner !== currentKey) return log('Retrait : REVERT « Signature invalide »', 'ko');
   if(!(amount > 0)) return log('Retrait : REVERT « Montant invalide »', 'ko');
   if(wallet.balance < amount) return log('Retrait : REVERT « Appel echoue » (solde du wallet insuffisant)', 'ko');
-  wallet.balance -= amount; wallet.nonce++; accounts[to] += amount;
-  log(NAMES[me] + ' retire ' + amount + ' ETH vers ' + NAMES[to], 'ok');
+  wallet.balance -= amount;
+  wallet.nonce++;
+  saveWallet();
+  log('Retrait de ' + amount + ' ETH', 'ok');
+  render();
+}
+
+function resetWallet(){
+  wallet = null;
+  saveWallet();
+  log('Wallet supprimé. Tu peux en créer un nouveau.', 'info');
   render();
 }
 
@@ -281,22 +274,14 @@ function log(msg, cls){
 }
 function fmt(x){ return Math.round(x*1e6)/1e6 + ' ETH'; }
 function render(){
-  const me = val('me');
-  document.getElementById('accounts').innerHTML =
-    '<tr><th>Compte</th><th>Solde</th></tr>' +
-    Object.keys(NAMES).map(k => '<tr><td>' + NAMES[k] + (k === me ? ' (connecté)' : '') + '</td><td>' + fmt(accounts[k]) + '</td></tr>').join('');
   document.getElementById('wallet').innerHTML = wallet
-    ? '<tr><th>owner</th><td>' + NAMES[wallet.owner] + (wallet.owner === me ? ' (vous)' : '') + '</td></tr>' +
+    ? '<tr><th>owner</th><td>' + wallet.owner + '</td></tr>' +
       '<tr><th>Solde du wallet</th><td>' + fmt(wallet.balance) + '</td></tr>' +
       '<tr><th>nonce</th><td>' + wallet.nonce + '</td></tr>'
-    : '<tr><td>Aucun wallet créé.</td></tr>';
-  document.getElementById('createBtn').disabled = !!wallet;
+    : '<tr><td>Aucun wallet.</td></tr>';
+  document.getElementById('createBox').hidden = !!wallet;
+  document.getElementById('actionsBox').hidden = !wallet;
 }
-
-const opts = Object.keys(NAMES).map(k => '<option value="' + k + '">' + NAMES[k] + '</option>').join('');
-document.getElementById('me').innerHTML = opts;
-document.getElementById('dest').innerHTML = opts;
-init(); render();
 </script>
 </body>
 </html>
