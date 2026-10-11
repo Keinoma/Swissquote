@@ -50,7 +50,7 @@ Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 | Application bancaire | Terminal (`cast`) | Application mobile Swissquote |
 | ETH | ETH de test (faucet), sans valeur | Fonds réels (hors périmètre : pas de mainnet) |
 
-## 3. Ce qui n'est pas fait (à ne pas présenter comme fait)
+## 3. Le reste de notre marche à suivre si le temps le permettait
 
 - **Pas ERC-4337** : `Wallet.sol` en imite l'idée (compte contrat, signature vérifiée par le compte, relayeur) mais n'a ni EntryPoint, ni bundler, ni paymaster, ni factory. Il n'est pas conforme au standard.
 - **Pas de passkey / WebAuthn** : la clé propriétaire est une clé de test.
