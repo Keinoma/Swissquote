@@ -10,7 +10,7 @@ Dans cet exemple fictif, "Alice" crée son compte et désigne trois guardiens : 
 Une fois son appareil perdu, deux (différents) gardiens peuvent approveRecovery().
 Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est probablement elle qui a demandé à ce que son nouvel appareil devienne owner à la place de son ancienne adresse)
 
-================================================================================================
+============================================================================================
 
 
 
