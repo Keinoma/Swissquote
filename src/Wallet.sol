@@ -10,7 +10,7 @@ contract Wallet {
 
     address[3] public guardians;
     uint256 public constant THRESHOLD = 2;
-    uint256 public constant DELAY = 1 days;
+    uint256 public constant DELAY = 12 seconds;
 
     address public pendingOwner;
     uint256 public approvalCount;

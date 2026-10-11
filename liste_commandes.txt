@@ -32,8 +32,14 @@ cast call ADRESSE_DU_CONTRAT "balances(address)(uint256)" argument_de_l'appel
 
 
 
-cast send 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 "requestWithdrawal()" --value 1ether --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d --rpc-url http://127.0.0.1:8545 
+- Stocker dans sepolia :
+    cast wallet new
+    cast wallet import sepolia-deployer --interactive
+Coller la key (elle ne se voit pas). Choisir mdp
 
+- Récup l'addresse stockée dans sepolia :
+    cast wallet address --account sepolia-deployer
+    Rentrer le mdp
 
 
 
