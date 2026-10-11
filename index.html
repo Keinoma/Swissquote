@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet - interface</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#222}
+  section{border-top:1px solid #ccc;padding-top:.5rem;margin-top:1.5rem}
+  table{border-collapse:collapse;width:100%;margin:.5rem 0}
+  td,th{border:1px solid #ccc;padding:.3rem .6rem;text-align:left;font-size:.9rem;word-break:break-all}
+  input,select,button{font-size:.95rem;padding:.35rem .6rem;margin:.15rem}
+  input{width:7rem}
+  input.wide{width:22rem;max-width:100%}
+  .authForm input{width:12rem;display:block}
+  .authForm label{display:block;margin:.4rem 0}
+  #authMsg{min-height:1.5rem}
+  .err{color:#c00}.good{color:#080}
+  .link{background:none;border:none;color:#06c;text-decoration:underline;cursor:pointer;padding:0}
+  #log,#forgotLog{background:#111;color:#ddd;padding:.75rem;min-height:60px;max-height:260px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:.85rem}
+  #forgotLog{margin:.5rem 0}
+  .ok{color:#6c6}.ko{color:#f77}.info{color:#8af}
+</style>
+</head>
+<body>
+
+<!-- ÉCRAN DE CONNEXION / CRÉATION DE COMPTE -->
+<div id="authScreen">
+
+  <div id="loginBox">
+    <h1>Connexion</h1>
+    <form class="authForm" onsubmit="return login(event)">
+      <label>Nom d'utilisateur
+        <input id="loginUser" type="text" autocomplete="username" autofocus>
+      </label>
+      <label>Mot de passe
+        <input id="loginPass" type="password" autocomplete="current-password">
+      </label>
+      <button type="submit">Se connecter</button>
+    </form>
+    <p>Pas encore de compte ? <button class="link" onclick="showSignup()">Créer un compte</button></p>
+    <p><button class="link" onclick="showForgot()">Mot de passe oublié ?</button></p>
+  </div>
+
+  <div id="forgotBox" hidden>
+    <h1>Mot de passe oublié</h1>
+    <p>La récupération passe par tes gardiens : 2 sur 3 doivent approuver un nouvel appareil, puis il faut attendre 24 h avant de finaliser.</p>
+    <form class="authForm" onsubmit="return forgotSearch(event)">
+      <label>Nom d'utilisateur
+        <input id="forgotUser" type="text" autocomplete="username">
+      </label>
+      <button type="submit">Rechercher mon compte</button>
+    </form>
+    <div id="forgotLog"></div>
+
+    <div id="forgotPanel" hidden>
+      <table id="forgotRec"></table>
+      Gardien qui approuve <select id="fgGuardian"></select><br>
+      Nouvel appareil proposé <select id="fgNew"></select><br>
+      <button onclick="forgotApprove()">Approuver (gardien)</button>
+      <button onclick="forgotFinalize()">Finaliser la récupération</button>
+      <button onclick="forgotSkip()">Avancer l'horloge de 24 h (Anvil)</button>
+
+      <div id="pwBox" hidden>
+        <h3>Récupération terminée : choisis un nouveau mot de passe</h3>
+        <form class="authForm" onsubmit="return resetPassword(event)">
+          <label>Nouveau mot de passe
+            <input id="fgPass" type="password" autocomplete="new-password">
+          </label>
+          <label>Confirmer le mot de passe
+            <input id="fgPass2" type="password" autocomplete="new-password">
+          </label>
+          <button type="submit">Enregistrer le nouveau mot de passe</button>
+        </form>
+      </div>
+    </div>
+
+    <p><button class="link" onclick="showLogin()">Retour à la connexion</button></p>
+  </div>
+
+  <div id="signupBox" hidden>
+    <h1>Créer un compte</h1>
+    <form class="authForm" onsubmit="return signup(event)">
+      <label>Nom d'utilisateur
+        <input id="signUser" type="text" autocomplete="username">
+      </label>
+      <label>Mot de passe
+        <input id="signPass" type="password" autocomplete="new-password">
+      </label>
+      <label>Confirmer le mot de passe
+        <input id="signPass2" type="password" autocomplete="new-password">
+      </label>
+      <button type="submit">Créer mon compte</button>
+    </form>
+    <p>Déjà un compte ? <button class="link" onclick="showLogin()">Se connecter</button></p>
+  </div>
+
+  <div id="authMsg"></div>
+</div>
+
+<!-- APPLICATION (cachée tant qu'on n'est pas connecté) -->
+<div id="app" hidden>
+
+<h1>Wallet - interface</h1>
+<p>Connecté en tant que <b id="currentUser"></b>. Les actions appellent le vrai contrat <code>Wallet.sol</code> déployé sur Anvil.</p>
+<p>Mon adresse Anvil : <code id="myAddr"></code></p>
+<button onclick="logout()">Se déconnecter</button>
+<button onclick="askDelete()">Supprimer mon compte</button>
+
+<div id="deleteBox" hidden>
+  <p class="err">Supprimer définitivement ton compte ? Ton nom d'utilisateur et ton mot de passe seront effacés (le contrat reste sur la blockchain).</p>
+  <button onclick="deleteAccount(true)">Oui</button>
+  <button onclick="deleteAccount(false)">Non</button>
+</div>
+
+<section>
+<h2>Mon wallet</h2>
+<table id="wallet"></table>
+
+<div id="createBox">
+  <p>Tu n'as pas encore de wallet. Il sera déployé à 0 ETH et t'appartiendra.</p>
+  <button onclick="createWallet()">Créer mon wallet</button>
+</div>
+
+<div id="actionsBox" hidden>
+  <h3>Recharger</h3>
+  Montant (ETH) <input id="depAmount" type="number" min="0" step="any" value="1">
+  <button onclick="deposit()">Recharger</button>
+
+  <h3>Retirer (la signature de l'owner est exigée par le contrat)</h3>
+  Montant (ETH) <input id="wdAmount" type="number" min="0" step="any" value="1"><br>
+  Vers (adresse, vide = mon adresse) <input id="wdDest" class="wide" type="text" placeholder="0x..."><br>
+  Signature faite par
+  <select id="wdSigner">
+    <option value="me">moi (mon compte Anvil)</option>
+    <option value="owner">l'owner actuel du contrat</option>
+    <option value="other">un autre compte Anvil (#9, un gardien)</option>
+  </select>
+  <button onclick="withdraw()">Retirer</button>
+
+  <h3>Récupération par les gardiens (2 sur 3, délai de 24 h)</h3>
+  <table id="recTable"></table>
+  <p>L'appelant doit être un gardien pour <code>approveRecovery</code>, l'owner actuel pour <code>cancelRecovery</code>, et n'importe qui pour <code>finalizeRecovery</code>.</p>
+  Appelant <select id="recCaller"></select><br>
+  Nouvel owner proposé <select id="recNew"></select><br>
+  <button onclick="approveRecovery()">approveRecovery</button>
+  <button onclick="finalizeRecovery()">finalizeRecovery</button>
+  <button onclick="cancelRecovery()">cancelRecovery</button>
+  <button onclick="skipTime()">Avancer l'horloge de 24 h (Anvil)</button>
+</div>
+</section>
+
+<h3>Journal</h3>
+<div id="log"></div>
+
+</div>
+
+<script>
+// ---------- Configuration blockchain ----------
+const RPC = 'http://127.0.0.1:8545';          // Anvil
+const ARTIFACT = 'out/Wallet.sol/Wallet.json'; // produit par « forge build »
+const GUARDIAN_INDEXES = [7, 8, 9];            // comptes Anvil utilisés comme gardiens
+const USER_INDEXES = [1, 2, 3, 4, 5, 6];       // comptes Anvil attribués aux utilisateurs
+const OTHER_INDEX = 9;                         // compte « autre » pour tester le refus
+const ROLES = {0: 'nouvel appareil', 7: 'Swissquote', 8: 'G2 (iPad d\'Alice)', 9: 'G3 (proche)'};
+
+let provider = null, artifact = null, anvilAddrs = [];
+
+function getProvider(){
+  if(typeof ethers === 'undefined') throw new Error('ethers.js non chargé (connexion internet nécessaire pour le CDN).');
+  if(!provider) provider = new ethers.JsonRpcProvider(RPC, ethers.Network.from(31337), {staticNetwork: true});
+  return provider;
+}
+function signerOf(i){ return getProvider().getSigner(i); }
+
+async function checkAnvil(){
+  try {
+    const r = await fetch(RPC, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({jsonrpc:'2.0', id:1, method:'eth_chainId', params:[]})});
+    if(!r.ok) throw new Error();
+  } catch(e){
+    throw new Error('Impossible de joindre Anvil sur ' + RPC + '. Lance « anvil » dans un terminal.');
+  }
+}
+
+async function loadAccounts(){
+  if(anvilAddrs.length) return;
+  const list = await getProvider().send('eth_accounts', []);
+  anvilAddrs = list.map(a => ethers.getAddress(a));
+}
+
+async function loadArtifact(){
+  if(artifact) return artifact;
+  const r = await fetch(ARTIFACT);
+  if(!r.ok) throw new Error('Fichier ' + ARTIFACT + ' introuvable. Lance « forge build » et ouvre la page depuis la racine du projet.');
+  artifact = await r.json();
+  return artifact;
+}
+
+// ---------- Comptes utilisateurs (stockés dans le navigateur) ----------
+const STORAGE_KEY = 'walletUsers';
+let currentKey = null;      // compte connecté
+let walletAddress = null;   // adresse du contrat de ce compte
+
+function loadUsers(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveUsers(users){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(users)); return true; }
+  catch(e){ return false; }
+}
+function currentUser(){ return loadUsers()[currentKey]; }
+function saveWalletAddress(){
+  const users = loadUsers();
+  if(!users[currentKey]) return;
+  users[currentKey].walletAddress = walletAddress;
+  saveUsers(users);
+}
+// Premier compte Anvil libre parmi ceux réservés aux utilisateurs
+function freeIndex(users){
+  const used = Object.values(users).map(u => u.accountIndex);
+  return USER_INDEXES.find(i => !used.includes(i));
+}
+
+// Le mot de passe n'est jamais stocké en clair : on garde son empreinte SHA-256
+async function hashPassword(username, password){
+  const data = new TextEncoder().encode(username + ':' + password);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function message(text, cls){
+  const m = document.getElementById('authMsg');
+  m.textContent = text;
+  m.className = cls || '';
+}
+function showSignup(){
+  document.getElementById('loginBox').hidden = true;
+  document.getElementById('forgotBox').hidden = true;
+  document.getElementById('signupBox').hidden = false;
+  message('');
+}
+function showLogin(){
+  document.getElementById('signupBox').hidden = true;
+  document.getElementById('forgotBox').hidden = true;
+  document.getElementById('loginBox').hidden = false;
+  forgotKey = null; forgotWallet = null;
+  document.getElementById('forgotPanel').hidden = true;
+  document.getElementById('forgotLog').innerHTML = '';
+  document.getElementById('forgotUser').value = '';
+  message('');
+}
+function showForgot(){
+  document.getElementById('loginBox').hidden = true;
+  document.getElementById('signupBox').hidden = true;
+  document.getElementById('forgotBox').hidden = false;
+  message('');
+}
+
+async function signup(e){
+  e.preventDefault();
+  const username = val('signUser').trim();
+  const pass = val('signPass'), pass2 = val('signPass2');
+  if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
+  if(!username) return message('Entre un nom d\'utilisateur.', 'err'), false;
+  if(!pass) return message('Entre un mot de passe.', 'err'), false;
+  if(pass !== pass2) return message('Les deux mots de passe ne correspondent pas.', 'err'), false;
+
+  const users = loadUsers();
+  const key = username;   // les majuscules comptent
+  if(users[key]) return message('Ce compte existe déjà. Retourne à l\'écran de connexion (lien « Se connecter » ci-dessus) et tape le mot de passe enregistré auparavant.', 'err'), false;
+
+  const idx = freeIndex(users);
+  if(!idx) return message('Plus de compte Anvil disponible (' + USER_INDEXES.length + ' utilisateurs maximum).', 'err'), false;
+
+  users[key] = {name: username, hash: await hashPassword(key, pass), accountIndex: idx, walletAddress: null};
+  if(!saveUsers(users)) return message('Impossible d\'enregistrer le compte dans ce navigateur.', 'err'), false;
+
+  document.getElementById('signUser').value = '';
+  document.getElementById('signPass').value = '';
+  document.getElementById('signPass2').value = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  showLogin();
+  message('Compte créé. Tu peux maintenant te connecter.', 'good');
+  return false;
+}
+
+async function login(e){
+  e.preventDefault();
+  const username = val('loginUser').trim();
+  const key = username;   // les majuscules comptent
+  if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
+
+  const users = loadUsers();
+  const user = users[key];
+  if(user && user.hash === await hashPassword(key, val('loginPass'))){
+    if(!user.accountIndex){   // compte créé avant l'ajout de la blockchain
+      user.accountIndex = freeIndex(users);
+      if(!user.accountIndex) return message('Plus de compte Anvil disponible.', 'err'), false;
+      saveUsers(users);
+    }
+    currentKey = key;
+    walletAddress = user.walletAddress || null;
+    document.getElementById('authScreen').hidden = true;
+    document.getElementById('app').hidden = false;
+    document.getElementById('currentUser').textContent = user.name;
+    document.getElementById('myAddr').textContent = '(chargement...)';
+    document.getElementById('deleteBox').hidden = true;
+    document.getElementById('log').innerHTML = '';
+    message('');
+    run('Connexion', async () => {
+      document.getElementById('myAddr').textContent = anvilAddrs[user.accountIndex] + '  (compte Anvil #' + user.accountIndex + ')';
+      fillSelects();
+    });
+  } else {
+    message('Nom d\'utilisateur ou mot de passe incorrect.', 'err');
+  }
+  return false;
+}
+
+function logout(){
+  currentKey = null;
+  walletAddress = null;
+  document.getElementById('app').hidden = true;
+  document.getElementById('authScreen').hidden = false;
+  document.getElementById('currentUser').textContent = '';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  showLogin();
+}
+
+function askDelete(){ document.getElementById('deleteBox').hidden = false; }
+
+function deleteAccount(confirmed){
+  document.getElementById('deleteBox').hidden = true;
+  if(!confirmed) return;
+  const users = loadUsers();
+  delete users[currentKey];
+  if(!saveUsers(users)) return alert('Impossible de supprimer le compte dans ce navigateur.');
+  logout();
+  message('Compte supprimé. Crée un nouveau compte ou connecte-toi à un autre compte.', 'good');
+}
+
+// ---------- Libellés des comptes Anvil ----------
+function roleOf(i){
+  if(ROLES[i]) return ROLES[i];
+  const u = Object.values(loadUsers()).find(x => x.accountIndex === i);
+  return u ? 'utilisateur ' + u.name : 'libre';
+}
+function labelOf(addr){
+  const i = anvilAddrs.indexOf(addr);
+  return i < 0 ? addr : addr + ' (Anvil #' + i + ', ' + roleOf(i) + ')';
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fillSelects(){
+  const caller = document.getElementById('recCaller'), nw = document.getElementById('recNew');
+  caller.innerHTML = ''; nw.innerHTML = '';
+  for(let i = 0; i < anvilAddrs.length; i++){
+    const text = '#' + i + ' - ' + roleOf(i);
+    caller.add(new Option(text, i));
+    nw.add(new Option(text, i));
+  }
+  caller.value = '7';   // Swissquote par défaut
+  nw.value = '0';       // nouvel appareil par défaut
+}
+
+// ---------- Appels vers le contrat Wallet.sol ----------
+function errMsg(e){ return e.reason || e.shortMessage || e.message || String(e); }
+
+async function run(label, fn){
+  try { await checkAnvil(); await loadAccounts(); await fn(); }
+  catch(e){ log(label + ' : ERREUR « ' + errMsg(e) + ' »', 'ko'); }
+  await refresh();
+}
+
+// index = compte Anvil qui envoie la transaction ; null = lecture seule
+async function contractAt(addr, index){
+  const art = await loadArtifact();
+  const runner = index === null ? getProvider() : await signerOf(index);
+  return new ethers.Contract(addr, art.abi, runner);
+}
+function contractAs(index){ return contractAt(walletAddress, index); }
+
+function createWallet(){
+  return run('Création', async () => {
+    if(walletAddress) throw new Error('Wallet déjà créé');
+    const art = await loadArtifact();
+    const signer = await signerOf(currentUser().accountIndex);
+    const owner = await signer.getAddress();
+    const guardians = GUARDIAN_INDEXES.map(i => anvilAddrs[i]);
+    const factory = new ethers.ContractFactory(art.abi, art.bytecode.object, signer);
+    const c = await factory.deploy(owner, guardians);
+    await c.waitForDeployment();
+    walletAddress = await c.getAddress();
+    saveWalletAddress();
+    const users = loadUsers();
+    if(users[currentKey]){ users[currentKey].knownOwner = owner; saveUsers(users); }
+    log('Wallet déployé à l\'adresse ' + walletAddress, 'ok');
+  });
+}
+
+function deposit(){
+  return run('Recharge', async () => {
+    const amount = parseFloat(val('depAmount'));
+    if(!(amount > 0)) throw new Error('Montant invalide');
+    const signer = await signerOf(currentUser().accountIndex);
+    const tx = await signer.sendTransaction({to: walletAddress, value: ethers.parseEther(String(amount))});
+    await tx.wait();
+    log('Wallet rechargé de ' + amount + ' ETH', 'ok');
+  });
+}
+
+// Le contrat vérifie lui-même que la signature vient de l'owner (execute)
+function withdraw(){
+  return run('Retrait', async () => {
+    const amount = parseFloat(val('wdAmount'));
+    if(!(amount > 0)) throw new Error('Montant invalide');
+    const user = currentUser();
+    const dest = val('wdDest').trim() || anvilAddrs[user.accountIndex];
+    if(!ethers.isAddress(dest)) throw new Error('Adresse de destination invalide');
+    const value = ethers.parseEther(String(amount));
+
+    const c = await contractAs(user.accountIndex);
+    const choice = val('wdSigner');
+    let signingIndex;
+    if(choice === 'me') signingIndex = user.accountIndex;
+    else if(choice === 'other') signingIndex = OTHER_INDEX;
+    else {
+      signingIndex = anvilAddrs.indexOf(await c.owner());
+      if(signingIndex < 0) throw new Error('L\'owner actuel n\'est pas un compte Anvil connu');
+    }
+    const signer = await signerOf(signingIndex);
+
+    const hash = await c.getHash(dest, value, '0x');
+    const sig = await signer.signMessage(ethers.getBytes(hash));
+    const tx = await c.execute(dest, value, '0x', sig);
+    await tx.wait();
+    log('Retrait de ' + amount + ' ETH vers ' + dest + ' (signé par Anvil #' + signingIndex + ')', 'ok');
+  });
+}
+
+// ---------- Récupération par les gardiens ----------
+function approveRecovery(){
+  const i = parseInt(val('recCaller')), n = parseInt(val('recNew'));
+  return run('approveRecovery', async () => {
+    const c = await contractAs(i);
+    const tx = await c.approveRecovery(anvilAddrs[n]);
+    await tx.wait();
+    log('Anvil #' + i + ' (' + roleOf(i) + ') approuve le nouvel owner Anvil #' + n + ' (' + roleOf(n) + ')', 'ok');
+  });
+}
+
+function finalizeRecovery(){
+  const i = parseInt(val('recCaller'));
+  return run('finalizeRecovery', async () => {
+    const c = await contractAs(i);
+    const tx = await c.finalizeRecovery();
+    await tx.wait();
+    log('Récupération finalisée : le nouvel owner est en place', 'ok');
+  });
+}
+
+function cancelRecovery(){
+  const i = parseInt(val('recCaller'));
+  return run('cancelRecovery', async () => {
+    const c = await contractAs(i);
+    const tx = await c.cancelRecovery();
+    await tx.wait();
+    log('Récupération annulée par Anvil #' + i, 'ok');
+  });
+}
+
+// Anvil : avance l'horloge de la blockchain (le délai du contrat dépend de block.timestamp)
+function skipTime(){
+  return run('Avance du temps', async () => {
+    const p = getProvider();
+    await p.send('evm_increaseTime', [86400]);
+    await p.send('evm_mine', []);
+    log('Horloge de la blockchain avancée de 24 h', 'info');
+  });
+}
+
+// ---------- Affichage ----------
+function val(id){ return document.getElementById(id).value; }
+function log(msg, cls){
+  const d = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = msg;
+  d.appendChild(line);
+  d.scrollTop = d.scrollHeight;
+}
+
+function formatDelay(seconds){
+  const s = Number(seconds);
+  return Math.floor(s / 3600) + ' h ' + Math.floor((s % 3600) / 60) + ' min';
+}
+
+// Lignes du tableau d'état de la récupération (lu depuis le contrat)
+async function recoveryRows(c){
+  const p = getProvider();
+  const [pending, count, readyAt, round] = await Promise.all([c.pendingOwner(), c.approvalCount(), c.readyAt(), c.recoveryRound()]);
+  const guardians = await Promise.all([0, 1, 2].map(i => c.guardians(i)));
+  const approved = await Promise.all(guardians.map(g => c.approvedInRound(round, g)));
+  const now = BigInt((await p.getBlock('latest')).timestamp);
+  const inProgress = pending !== ethers.ZeroAddress;
+
+  let delay;
+  if(!inProgress) delay = '-';
+  else if(readyAt === 0n) delay = 'pas encore démarré (il faut 2 approbations)';
+  else if(now >= readyAt) delay = 'écoulé : finalizeRecovery est possible';
+  else delay = 'encore ' + formatDelay(readyAt - now) + ' avant finalizeRecovery';
+
+  return '<tr><th>Nouvel owner proposé</th><td>' + (inProgress ? esc(labelOf(pending)) : 'Aucune récupération en cours') + '</td></tr>' +
+    '<tr><th>Approbations</th><td>' + (inProgress ? count + ' / 2' : '-') + '</td></tr>' +
+    '<tr><th>Délai de 24 h</th><td>' + delay + '</td></tr>' +
+    guardians.map((g, i) =>
+      '<tr><th>Gardien ' + (i + 1) + '</th><td>' + esc(labelOf(g)) + (inProgress && approved[i] ? ' - a approuvé' : '') + '</td></tr>').join('');
+}
+
+// ---------- Mot de passe oublié : récupération depuis l'écran de connexion ----------
+let forgotKey = null, forgotWallet = null;
+
+function flog(msg, cls){
+  const d = document.getElementById('forgotLog');
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = msg;
+  d.appendChild(line);
+  d.scrollTop = d.scrollHeight;
+}
+
+async function forgotRun(label, fn){
+  try { await checkAnvil(); await loadAccounts(); await fn(); }
+  catch(e){ flog(label + ' : ERREUR « ' + errMsg(e) + ' »', 'ko'); }
+  await forgotRefresh();
+}
+
+async function forgotSearch(e){
+  e.preventDefault();
+  forgotKey = null; forgotWallet = null;
+  document.getElementById('forgotPanel').hidden = true;
+  document.getElementById('forgotLog').innerHTML = '';
+  const key = val('forgotUser').trim();
+  const user = loadUsers()[key];
+  if(!user) return flog('Ce nom d\'utilisateur n\'existe pas.', 'ko'), false;
+  if(!user.walletAddress) return flog('Ce compte n\'a pas de wallet : la récupération par les gardiens est impossible.', 'ko'), false;
+
+  forgotKey = key;
+  forgotWallet = user.walletAddress;
+  document.getElementById('forgotPanel').hidden = false;
+  await forgotRun('Recherche', async () => {
+    const used = Object.values(loadUsers()).map(u => u.accountIndex);
+    const g = document.getElementById('fgGuardian'), n = document.getElementById('fgNew');
+    g.innerHTML = ''; n.innerHTML = '';
+    GUARDIAN_INDEXES.forEach(i => g.add(new Option('#' + i + ' - ' + roleOf(i), i)));
+    [0, ...USER_INDEXES].filter(i => !used.includes(i)).forEach(i => n.add(new Option('#' + i + ' - ' + roleOf(i), i)));
+  });
+  return false;
+}
+
+async function forgotRefresh(){
+  if(!forgotKey) return;
+  const rec = document.getElementById('forgotRec');
+  try {
+    if(await getProvider().getCode(forgotWallet) === '0x'){
+      rec.innerHTML = '';
+      document.getElementById('pwBox').hidden = true;
+      return flog('Le wallet n\'existe plus sur la blockchain (Anvil redémarré ?).', 'ko');
+    }
+    await loadAccounts();
+    const c = await contractAt(forgotWallet, null);
+    const owner = await c.owner();
+    rec.innerHTML = '<tr><th>owner actuel</th><td>' + esc(labelOf(owner)) + '</td></tr>' + await recoveryRows(c);
+    const user = loadUsers()[forgotKey];
+    const known = user.knownOwner || anvilAddrs[user.accountIndex];
+    document.getElementById('pwBox').hidden = (owner === known);   // nouvel owner en place = récupération terminée
+  } catch(e){
+    flog('Lecture du wallet : ERREUR « ' + errMsg(e) + ' »', 'ko');
+  }
+}
+
+function forgotApprove(){
+  const i = parseInt(val('fgGuardian')), n = parseInt(val('fgNew'));
+  return forgotRun('approveRecovery', async () => {
+    if(isNaN(n)) throw new Error('Aucun compte disponible comme nouvel appareil');
+    const c = await contractAt(forgotWallet, i);
+    const tx = await c.approveRecovery(anvilAddrs[n]);
+    await tx.wait();
+    flog('Anvil #' + i + ' (' + roleOf(i) + ') approuve le nouvel appareil Anvil #' + n + ' (' + roleOf(n) + ')', 'ok');
+  });
+}
+
+function forgotFinalize(){
+  return forgotRun('finalizeRecovery', async () => {
+    const c = await contractAt(forgotWallet, 0);   // n'importe qui peut finaliser
+    const tx = await c.finalizeRecovery();
+    await tx.wait();
+    flog('Récupération finalisée : le nouvel appareil est owner du wallet', 'ok');
+  });
+}
+
+function forgotSkip(){
+  return forgotRun('Avance du temps', async () => {
+    const p = getProvider();
+    await p.send('evm_increaseTime', [86400]);
+    await p.send('evm_mine', []);
+    flog('Horloge de la blockchain avancée de 24 h', 'info');
+  });
+}
+
+async function resetPassword(e){
+  e.preventDefault();
+  const pass = val('fgPass'), pass2 = val('fgPass2');
+  if(!pass) return flog('Entre un nouveau mot de passe.', 'ko'), false;
+  if(pass !== pass2) return flog('Les deux mots de passe ne correspondent pas.', 'ko'), false;
+  try {
+    await checkAnvil(); await loadAccounts();
+    const users = loadUsers(), user = users[forgotKey];
+    const owner = await (await contractAt(forgotWallet, null)).owner();
+    if(owner === (user.knownOwner || anvilAddrs[user.accountIndex]))
+      return flog('Aucune récupération terminée : le nouvel owner n\'est pas encore en place.', 'ko'), false;
+
+    user.hash = await hashPassword(forgotKey, pass);
+    user.knownOwner = owner;
+    // Le compte utilisateur suit le nouvel owner s'il est un compte Anvil libre
+    const idx = anvilAddrs.indexOf(owner);
+    const takenByOther = Object.entries(users).some(([k, u]) => k !== forgotKey && u.accountIndex === idx);
+    if(idx >= 0 && !takenByOther) user.accountIndex = idx;
+    if(!saveUsers(users)) return flog('Impossible d\'enregistrer le nouveau mot de passe dans ce navigateur.', 'ko'), false;
+
+    document.getElementById('fgPass').value = '';
+    document.getElementById('fgPass2').value = '';
+    showLogin();
+    message('Mot de passe modifié. Tu peux maintenant te connecter.', 'good');
+  } catch(err){
+    flog('Nouveau mot de passe : ERREUR « ' + errMsg(err) + ' »', 'ko');
+  }
+  return false;
+}
+
+async function refresh(){
+  const table = document.getElementById('wallet'), rec = document.getElementById('recTable');
+  try {
+    if(walletAddress){
+      if(await getProvider().getCode(walletAddress) === '0x'){
+        log('Le wallet n\'existe plus sur la blockchain (Anvil redémarré ?). Crée-en un nouveau.', 'ko');
+        walletAddress = null;
+        saveWalletAddress();
+      }
+    }
+    if(walletAddress){
+      await loadAccounts();
+      const p = getProvider(), c = await contractAs(currentUser().accountIndex);
+      const [owner, nonce, balance] = await Promise.all([c.owner(), c.nonce(), p.getBalance(walletAddress)]);
+      const me = anvilAddrs[currentUser().accountIndex];
+      table.innerHTML =
+        '<tr><th>Adresse du contrat</th><td>' + esc(walletAddress) + '</td></tr>' +
+        '<tr><th>owner</th><td>' + esc(labelOf(owner)) + (owner === me ? ' - vous' : '') + '</td></tr>' +
+        '<tr><th>Solde du wallet</th><td>' + ethers.formatEther(balance) + ' ETH</td></tr>' +
+        '<tr><th>nonce</th><td>' + nonce + '</td></tr>';
+
+      rec.innerHTML = await recoveryRows(c);
+    } else {
+      table.innerHTML = '<tr><td>Aucun wallet.</td></tr>';
+      rec.innerHTML = '';
+    }
+  } catch(e){
+    log('Lecture du wallet : ERREUR « ' + errMsg(e) + ' »', 'ko');
+  }
+  document.getElementById('createBox').hidden = !!walletAddress;
+  document.getElementById('actionsBox').hidden = !walletAddress;
+}
+</script>
+</body>
+</html>
