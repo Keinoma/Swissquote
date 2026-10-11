@@ -12,6 +12,12 @@ Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est proba
 
 ==========================================================================================
 
+- **Pouvoir de signer** : uniquement la clé du propriétaire (Alice, puis NEW après récupération). Swissquote ne peut pas déplacer de fonds.
+- **Pouvoir de récupérer** : 2 gardiens sur 3, après le délai ; le propriétaire peut annuler pendant ce temps.
+- **Pouvoir de Swissquote** : une voix sur trois, plus la possibilité de relayer et de payer le gas. Il ne peut ni changer un montant ou une destination signés, ni rejouer une signature, ni récupérer seul.
+
+==========================================================================================
+
 Le script Wallet.sol imite ERC-4337. Nous avons tenté de le traduire proprement mais n'avons pas réussi dans le temps impartis malheureusement.
 
 ==========================================================================================
@@ -80,13 +86,6 @@ Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 | Scénario B : annulation par NEW (propriétaire) | À COMPLÉTER |
 
 Lien type : `https://sepolia.etherscan.io/tx/` suivi du hash.
-
-## 5. Où sont le pouvoir et les clés
-
-- **Pouvoir de signer** : uniquement la clé du propriétaire (Alice, puis NEW après récupération). Swissquote ne peut pas déplacer de fonds.
-- **Pouvoir de récupérer** : 2 gardiens sur 3, après le délai ; le propriétaire peut annuler pendant ce temps.
-- **Pouvoir de Swissquote** : une voix sur trois, plus la possibilité de relayer et de payer le gas. Il ne peut ni changer un montant ou une destination signés, ni rejouer une signature, ni récupérer seul.
-
 
 ### Cast
 
