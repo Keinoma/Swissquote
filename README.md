@@ -11,8 +11,9 @@ Une fois son appareil perdu, deux (différents) gardiens peuvent approveRecovery
 Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est probablement elle qui a demandé à ce que son nouvel appareil devienne owner à la place de son ancienne adresse)
 
 ============================================================================================
+============================================================================================
 
-
+Le script Wallet.sol imite ERC-4337. Nous avons tenté de le traduire proprement mais n'avons pas réussi dans le temps impartis malheureusement.
 
 ## Tableau « réel / mocké »
 
