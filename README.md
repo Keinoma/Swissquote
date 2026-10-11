@@ -1,11 +1,13 @@
 ### Hackathon BSA - Swissquote Track
 
+Voici notre solution pour un modèle de self custody. Une personne a un compte et en est le possesseur.
+Si elle perd ses accès, deux parmis trois gardiens qu'elle aura séléctionné avant la perte de sa clé privée peuvent définir un nouveau possesseur du compte.
+Ainsi, ce nouveau possesseur peut être la personne qui aurait acheté un nouvel appareil mobile après la perte du premier.
 
 
 # Tableau « réel / mocké »
 
-Prototype de wallet self-custody avec récupération par gardiens (Swissquote Wallet Prize).
-Réseau : **Ethereum Sepolia** (chain ID 11155111), le 2026-10-11.
+
 Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 
 ## 1. Ce qui est réel (vérifiable sur Etherscan)
