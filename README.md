@@ -1,12 +1,17 @@
 ### Hackathon BSA - Swissquote Track
 
 Voici notre solution pour un modèle de self custody. Une personne a un compte et en est le possesseur.
-Si elle perd ses accès, deux parmis trois gardiens qu'elle aura séléctionné avant la perte de sa clé privée peuvent définir un nouveau possesseur du compte.
+Si elle perd sa clé, deux parmis trois gardiens qu'elle aura séléctionné avant la perte de sa clé privée peuvent définir un nouveau possesseur du compte.
 Ainsi, ce nouveau possesseur peut être la personne qui aurait acheté un nouvel appareil mobile après la perte du premier.
 
+Le fichier src/Wallet.sol permet le comportement décrit ci-dessus. On peut s'en convaincre en suivant les instructions du fichier Instructions5_guardiens.txt .
 
-# Tableau « réel / mocké »
+Dans cet exemple fictif, "Alice" crée son compte et désigne trois guardiens : un autre appareil à elle (G2), une proche (G3) à elle et sa banque (Swissquote).
+Une fois son appareil perdu, deux (différents) gardiens peuvent approveRecovery().
+Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est probablement elle qui a demandé à ce que son nouvel appareil devienne owner à la place de son ancienne adresse)
 
+
+## Tableau « réel / mocké »
 
 Contrat : `0xEf3e5840A276E1Ff63901baa352577B2D14db701` (`src/Wallet.sol`).
 
