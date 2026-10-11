@@ -66,6 +66,13 @@
 <p>Connecté en tant que <b id="currentUser"></b>. Simulation dans le navigateur (pas de blockchain). Seul l'owner du wallet peut en retirer de l'argent.</p>
 <button onclick="resetAll()">Réinitialiser tout</button>
 <button onclick="logout()">Se déconnecter</button>
+<button onclick="askDelete()">Supprimer mon compte</button>
+
+<div id="deleteBox" hidden>
+  <p class="err">Supprimer définitivement ton compte ? Ton nom d'utilisateur et ton mot de passe seront effacés.</p>
+  <button onclick="deleteAccount(true)">Oui</button>
+  <button onclick="deleteAccount(false)">Non</button>
+</div>
 
 <section>
 <h2>1. Compte connecté</h2>
@@ -146,8 +153,8 @@ async function signup(e){
   if(pass !== pass2) return message('Les deux mots de passe ne correspondent pas.', 'err'), false;
 
   const users = loadUsers();
-  const key = username.toLowerCase();
-  if(users[key]) return message('Ce nom d\'utilisateur est déjà pris.', 'err'), false;
+  const key = username;
+  if(users[key]) return message('Ce compte déjà existant. Retourne à l\'écran de connexion.', 'err'), false;
 
   users[key] = {name: username, hash: await hashPassword(key, pass)};
   if(!saveUsers(users)) return message('Impossible d\'enregistrer le compte dans ce navigateur.', 'err'), false;
@@ -163,10 +170,12 @@ async function signup(e){
   return false;
 }
 
+let currentKey = null;   // clé du compte actuellement connecté
+
 async function login(e){
   e.preventDefault();
   const username = val('loginUser').trim();
-  const key = username.toLowerCase();
+  const key = username;
   if(!window.crypto || !crypto.subtle) return message('Navigateur non compatible (ouvre la page via Live Server ou https).', 'err'), false;
 
   const user = loadUsers()[key];
@@ -174,6 +183,7 @@ async function login(e){
     document.getElementById('authScreen').hidden = true;
     document.getElementById('app').hidden = false;
     document.getElementById('currentUser').textContent = user.name;
+    currentKey = key;
     message('');
     resetAll();
   } else {
@@ -190,6 +200,22 @@ function logout(){
   document.getElementById('loginPass').value = '';
   showLogin();
 }
+function askDelete(){
+  document.getElementById('deleteBox').hidden = false;
+}
+
+function deleteAccount(confirmed){
+  document.getElementById('deleteBox').hidden = true;
+  if(!confirmed) return;
+
+  const users = loadUsers();
+  delete users[currentKey];
+  if(!saveUsers(users)) return alert('Impossible de supprimer le compte dans ce navigateur.');
+
+  currentKey = null;
+  logout();   // retour à l'écran de connexion, champs vidés
+  message('Compte supprimé.', 'good');
+}
 
 // ---------- Wallet ----------
 const NAMES = {ALICE:'Alice', BOB:'Bob', CAROL:'Carol'};
@@ -203,6 +229,7 @@ function init(){
 }
 
 function resetAll(){
+  document.getElementById('deleteBox').hidden = true;
   init();
   document.getElementById('me').value = 'ALICE';
   document.getElementById('dest').value = 'ALICE';
