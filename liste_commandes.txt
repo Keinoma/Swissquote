@@ -1,3 +1,7 @@
+au debut : curl -L https://foundry.paradigm.xyz | bash
+
+un peu après : forge install OpenZeppelin/openzeppelin-contracts
+
 - créer un BC dans un terminal qu'on touchera plus jms :
 anvil
 
