@@ -1,0 +1,135 @@
+<!DOCTYPE html>             // installe l'extension live server et clic droit -> lancer avec live server
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet - démo</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.5;color:#222}
+  section{border-top:1px solid #ccc;padding-top:.5rem;margin-top:1.5rem}
+  table{border-collapse:collapse;width:100%}
+  td,th{border:1px solid #ccc;padding:.3rem .6rem;text-align:left;font-size:.9rem}
+  input,select,button{font-size:.95rem;padding:.35rem .6rem;margin:.15rem}
+  input{width:7rem} 
+  #log{background:#111;color:#ddd;padding:.75rem;min-height:100px;max-height:260px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:.85rem}
+  .ok{color:#6c6}.ko{color:#f77}.info{color:#8af}
+</style>
+</head>
+<body>
+
+<h1>Wallet - démo</h1>
+<p>Simulation dans le navigateur (pas de blockchain). Seul l'owner du wallet peut en retirer de l'argent.</p>
+<button onclick="resetAll()">Réinitialiser tout</button>
+
+<section>
+<h2>1. Compte connecté</h2>
+<select id="me" onchange="render()"></select>
+<table id="accounts"></table>
+</section>
+
+<section>
+<h2>2. Créer le wallet</h2>
+<p>Le compte connecté devient l'owner.</p>
+Dépôt initial (ETH) <input id="initDeposit" type="number" min="0" step="any" value="3">
+<button id="createBtn" onclick="createWallet()">Créer le wallet</button>
+</section>
+
+<section>
+<h2>3. Wallet</h2>
+<table id="wallet"></table>
+
+<h3>Déposer (tout le monde peut)</h3>
+Montant (ETH) <input id="depAmount" type="number" min="0" step="any" value="1">
+<button onclick="deposit()">Déposer</button>
+
+<h3>Retirer (owner uniquement)</h3>
+Montant (ETH) <input id="wdAmount" type="number" min="0" step="any" value="1">
+Vers <select id="dest"></select>
+<button onclick="withdraw()">Retirer</button>
+</section>
+
+<h3>Journal</h3>
+<div id="log"></div>
+
+<script>
+const NAMES = {ALICE:'Alice', BOB:'Bob', CAROL:'Carol'};
+let accounts, wallet;   // wallet = null tant qu'il n'est pas créé
+
+function init(){
+  accounts = {ALICE:10, BOB:10, CAROL:10};
+  wallet = null;
+  document.getElementById('log').innerHTML = '';
+  log('Chaque compte démarre avec 10 ETH.', 'info');
+}
+
+function resetAll(){
+  init();
+  document.getElementById('me').value = 'ALICE';
+  document.getElementById('dest').value = 'ALICE';
+  document.getElementById('initDeposit').value = 3;
+  document.getElementById('depAmount').value = 1;
+  document.getElementById('wdAmount').value = 1;
+  render();
+}
+
+function createWallet(){
+  const me = val('me'), amount = num('initDeposit');
+  if(wallet) return log('Création : REVERT « Wallet déjà créé »', 'ko');
+  if(isNaN(amount) || amount < 0) return log('Création : REVERT « Montant invalide »', 'ko');
+  if(accounts[me] < amount) return log('Création : REVERT « Solde insuffisant »', 'ko');
+  accounts[me] -= amount;
+  wallet = {owner: me, balance: amount, nonce: 0};
+  log(NAMES[me] + ' crée le wallet (owner = ' + NAMES[me] + ') avec ' + amount + ' ETH', 'ok');
+  render();
+}
+
+function deposit(){
+  const me = val('me'), amount = num('depAmount');
+  if(!wallet) return log('Dépôt : REVERT « Pas de wallet »', 'ko');
+  if(!(amount > 0)) return log('Dépôt : REVERT « Montant invalide »', 'ko');
+  if(accounts[me] < amount) return log('Dépôt : REVERT « Solde insuffisant »', 'ko');
+  accounts[me] -= amount; wallet.balance += amount;
+  log(NAMES[me] + ' dépose ' + amount + ' ETH', 'ok');
+  render();
+}
+
+// Même règle que execute() dans Wallet.sol : la signature doit venir de l'owner
+function withdraw(){
+  const me = val('me'), amount = num('wdAmount'), to = val('dest');
+  if(!wallet) return log('Retrait : REVERT « Pas de wallet »', 'ko');
+  if(me !== wallet.owner) return log(NAMES[me] + ' retire ' + amount + ' ETH : REVERT « Signature invalide » (owner = ' + NAMES[wallet.owner] + ')', 'ko');
+  if(!(amount > 0)) return log('Retrait : REVERT « Montant invalide »', 'ko');
+  if(wallet.balance < amount) return log('Retrait : REVERT « Appel echoue » (solde du wallet insuffisant)', 'ko');
+  wallet.balance -= amount; wallet.nonce++; accounts[to] += amount;
+  log(NAMES[me] + ' retire ' + amount + ' ETH vers ' + NAMES[to], 'ok');
+  render();
+}
+
+function val(id){ return document.getElementById(id).value; }
+function num(id){ return parseFloat(val(id)); }
+function log(msg, cls){
+  const d = document.getElementById('log');
+  d.innerHTML += '<div class="' + cls + '">' + msg + '</div>';
+  d.scrollTop = d.scrollHeight;
+}
+function fmt(x){ return Math.round(x*1e6)/1e6 + ' ETH'; }
+function render(){
+  const me = val('me');
+  document.getElementById('accounts').innerHTML =
+    '<tr><th>Compte</th><th>Solde</th></tr>' +
+    Object.keys(NAMES).map(k => '<tr><td>' + NAMES[k] + (k === me ? ' (connecté)' : '') + '</td><td>' + fmt(accounts[k]) + '</td></tr>').join('');
+  document.getElementById('wallet').innerHTML = wallet
+    ? '<tr><th>owner</th><td>' + NAMES[wallet.owner] + (wallet.owner === me ? ' (vous)' : '') + '</td></tr>' +
+      '<tr><th>Solde du wallet</th><td>' + fmt(wallet.balance) + '</td></tr>' +
+      '<tr><th>nonce</th><td>' + wallet.nonce + '</td></tr>'
+    : '<tr><td>Aucun wallet créé.</td></tr>';
+  document.getElementById('createBtn').disabled = !!wallet;
+}
+
+const opts = Object.keys(NAMES).map(k => '<option value="' + k + '">' + NAMES[k] + '</option>').join('');
+document.getElementById('me').innerHTML = opts;
+document.getElementById('dest').innerHTML = opts;
+init(); render();
+</script>
+</body>
+</html>
