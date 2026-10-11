@@ -4,17 +4,21 @@ Voici notre solution pour un modèle de self custody. Une personne a un compte e
 Si elle perd sa clé, deux parmis trois gardiens qu'elle aura séléctionné avant la perte de sa clé privée peuvent définir un nouveau possesseur du compte.
 Ainsi, ce nouveau possesseur peut être la personne qui aurait acheté un nouvel appareil mobile après la perte du premier.
 
-Le fichier src/Wallet.sol permet le comportement décrit ci-dessus. On peut s'en convaincre en suivant les instructions du fichier Instructions5_guardiens.txt .
-
 Dans cet exemple fictif, "Alice" crée son compte et désigne trois guardiens : un autre appareil à elle (G2), une proche (G3) à elle et sa banque (Swissquote).
 Une fois son appareil perdu, deux (différents) gardiens peuvent approveRecovery().
 Si ALICE n'y voit pas d'inconvénient (ce qui est peu probable comme c'est probablement elle qui a demandé à ce que son nouvel appareil devienne owner à la place de son ancienne adresse)
 
 ==========================================================================================
+La fonction approveRecovery() deamnde à être appelée par un guardien. Elle nécessite aussi d'être est appelée 2 fois, et par 2 guardiens différents.
+La fonction finalizeREcovery() est appelable après 24h et sert de validation au changement de compte "owner" approuvé 2 fois. Elle est appelable par n'importe qui comme cela ne peut pas causer de tort à l'ancienne propriétaire du compte.
+Si en revanche, un pirate parvient à faire que 2 guardiens appellent approveRecovery(), le délais de 24heures sert à laisser du temps au possesseur actuel du compte pour se rendre comtpe de la supercherie et appeler cancelRecovery().
+ATTENTION : ce délais est actuellement de 12 [s] pour des raisons de practicité :)
 
 - **Pouvoir de signer** : uniquement la clé du propriétaire (Alice, puis NEW après récupération). Swissquote ne peut pas déplacer de fonds.
 - **Pouvoir de récupérer** : 2 gardiens sur 3, après le délai ; le propriétaire peut annuler pendant ce temps.
 - **Pouvoir de Swissquote** : une voix sur trois, plus la possibilité de relayer et de payer le gas. Il ne peut ni changer un montant ou une destination signés, ni rejouer une signature, ni récupérer seul.
+
+Le fichier src/Wallet.sol permet le comportement décrit ci-dessus. On peut s'en convaincre en suivant les instructions du fichier Instructions5_guardiens.txt .
 
 ==========================================================================================
 
